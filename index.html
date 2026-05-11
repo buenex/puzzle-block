@@ -52,6 +52,13 @@
         font-size:16px;
     }
 
+    select{
+        padding:10px;
+        border:none;
+        border-radius:8px;
+        font-size:16px;
+    }
+
     button{
         border:none;
         padding:12px 16px;
@@ -209,13 +216,22 @@
 
 <div class="modal" id="timesModal">
     <div class="modal-content">
+
         <h2>Tempos Finalizados</h2>
+
+        <div style="margin-bottom:15px;">
+            <label>Filtrar matriz</label>
+
+            <select id="boardFilter" onchange="renderHistory()">
+            </select>
+        </div>
 
         <div id="history"></div>
 
         <button class="close" onclick="closeTimes()">
             Fechar
         </button>
+
     </div>
 </div>
 
@@ -237,12 +253,13 @@ const winnerEl = document.getElementById("winner")
 
 function generateBoard(){
 
+    clearInterval(timer)
+
     rows = parseInt(document.getElementById("sizeY").value)
     cols = parseInt(document.getElementById("sizeX").value)
 
     const total = rows * cols
 
-    // cria tabuleiro resolvido
     board = []
 
     for(let i = 1; i < total; i++){
@@ -251,7 +268,6 @@ function generateBoard(){
 
     board.push(null)
 
-    // embaralha de forma válida
     do{
         shuffle(board)
     }while(
@@ -262,13 +278,14 @@ function generateBoard(){
     moves = 0
     seconds = 0
     started = false
-    winnerEl.textContent = ""
     gameFinished = false
 
-    clearInterval(timer)
+    winnerEl.textContent = ""
 
     updateStats()
     renderBoard()
+
+    saveGameState()
 }
 
 function resetGame(){
@@ -288,10 +305,14 @@ function renderBoard(){
         tile.className = "tile"
 
         if(value === null){
+
             tile.classList.add("empty")
+
         }else{
+
             tile.textContent = value
             tile.onclick = () => moveTile(index)
+
         }
 
         boardEl.appendChild(tile)
@@ -382,40 +403,33 @@ function moveTile(index){
 
     if(!moved) return
 
+    // timer só inicia ao mover novamente após carregar
     if(!started){
-        startTimer()
+
         started = true
+        startTimer()
+
     }
 
     moves++
 
     updateStats()
-
     renderBoard()
+
+    saveGameState()
 
     if(isSolved(board)){
 
         clearInterval(timer)
+
         gameFinished = true
+
+        clearGameState()
 
         winnerEl.textContent = "🎉 Puzzle Completo!"
 
         saveTime()
     }
-}
-
-function isAdjacent(a, b){
-
-    const ax = a % cols
-    const ay = Math.floor(a / cols)
-
-    const bx = b % cols
-    const by = Math.floor(b / cols)
-
-    return (
-        (Math.abs(ax - bx) === 1 && ay === by) ||
-        (Math.abs(ay - by) === 1 && ax === bx)
-    )
 }
 
 function shuffle(array){
@@ -436,7 +450,6 @@ function isSolvable(arr, rows, cols){
 
     const numbers = arr.filter(v => v !== null)
 
-    // conta inversões
     for(let i = 0; i < numbers.length; i++){
 
         for(let j = i + 1; j < numbers.length; j++){
@@ -449,12 +462,10 @@ function isSolvable(arr, rows, cols){
 
     }
 
-    // largura ímpar
     if(cols % 2 !== 0){
         return inversions % 2 === 0
     }
 
-    // largura par
     const emptyIndex = arr.indexOf(null)
     const emptyRowFromBottom = rows - Math.floor(emptyIndex / cols)
 
@@ -487,10 +498,15 @@ function updateStats(){
 
 function startTimer(){
 
+    clearInterval(timer)
+
     timer = setInterval(() => {
 
         seconds++
+
         updateStats()
+
+        saveGameState()
 
     }, 1000)
 
@@ -506,7 +522,9 @@ function formatTime(sec){
 
 function saveTime(){
 
-    const history = JSON.parse(localStorage.getItem("puzzleHistory") || "[]")
+    const history = JSON.parse(
+        localStorage.getItem("puzzleHistory") || "[]"
+    )
 
     history.push({
         board: `${cols}x${rows}`,
@@ -515,26 +533,143 @@ function saveTime(){
         timestamp: new Date().toLocaleString()
     })
 
-    localStorage.setItem("puzzleHistory", JSON.stringify(history))
+    localStorage.setItem(
+        "puzzleHistory",
+        JSON.stringify(history)
+    )
+}
 
+function saveGameState(){
+
+    const state = {
+
+        board,
+        rows,
+        cols,
+        moves,
+        seconds,
+
+        // importante:
+        // ao carregar o timer fica congelado
+        started: false,
+
+        gameFinished
+
+    }
+
+    localStorage.setItem(
+        "slidingPuzzleCurrentGame",
+        JSON.stringify(state)
+    )
+}
+
+function loadGameState(){
+
+    const data = localStorage.getItem(
+        "slidingPuzzleCurrentGame"
+    )
+
+    if(!data) return false
+
+    const save = JSON.parse(data)
+
+    board = save.board
+    rows = save.rows
+    cols = save.cols
+    moves = save.moves
+    seconds = save.seconds
+    started = false
+    gameFinished = save.gameFinished
+
+    document.getElementById("sizeX").value = cols
+    document.getElementById("sizeY").value = rows
+
+    updateStats()
+    renderBoard()
+
+    return true
+}
+
+function clearGameState(){
+
+    localStorage.removeItem(
+        "slidingPuzzleCurrentGame"
+    )
 }
 
 function openTimes(){
 
     const modal = document.getElementById("timesModal")
+
+    const history = JSON.parse(
+        localStorage.getItem("puzzleHistory") || "[]"
+    )
+
+    const filterEl = document.getElementById("boardFilter")
+
+    const uniqueBoards = [
+        ...new Set(history.map(item => item.board))
+    ]
+
+    filterEl.innerHTML = ""
+
+    const allOption = document.createElement("option")
+
+    allOption.value = "all"
+    allOption.textContent = "Todos"
+
+    filterEl.appendChild(allOption)
+
+    uniqueBoards
+        .sort()
+        .forEach(board => {
+
+            const option = document.createElement("option")
+
+            option.value = board
+            option.textContent = board
+
+            filterEl.appendChild(option)
+
+        })
+
+    renderHistory()
+
+    modal.style.display = "flex"
+}
+
+function renderHistory(){
+
     const historyEl = document.getElementById("history")
 
-    const history = JSON.parse(localStorage.getItem("puzzleHistory") || "[]")
+    const filter =
+        document.getElementById("boardFilter").value
+
+    const history = JSON.parse(
+        localStorage.getItem("puzzleHistory") || "[]"
+    )
 
     historyEl.innerHTML = ""
 
-    if(history.length === 0){
+    let filtered = history
 
-        historyEl.innerHTML = "<p>Nenhum tempo salvo.</p>"
+    if(filter !== "all"){
 
-    }else{
+        filtered = history.filter(item =>
+            item.board === filter
+        )
 
-        history
+    }
+
+    if(filtered.length === 0){
+
+        historyEl.innerHTML =
+            "<p>Nenhum tempo salvo.</p>"
+
+        return
+    }
+
+    filtered
         .slice()
         .reverse()
         .forEach(item => {
@@ -553,17 +688,21 @@ function openTimes(){
             historyEl.appendChild(div)
 
         })
-
-    }
-
-    modal.style.display = "flex"
 }
 
 function closeTimes(){
+
     document.getElementById("timesModal").style.display = "none"
+
 }
 
-generateBoard()
+const loaded = loadGameState()
+
+if(!loaded){
+
+    generateBoard()
+
+}
 
 </script>
 
