@@ -96,8 +96,7 @@
     }
 
     #board{
-        display:grid;
-        gap:6px;
+        position:relative;
         width:fit-content;
         margin:auto;
         background:#1f2937;
@@ -106,18 +105,29 @@
     }
 
     .tile{
+        position:absolute;
+
         width:70px;
         height:70px;
+
         background:#2563eb;
+
         display:flex;
         align-items:center;
         justify-content:center;
+
         font-size:24px;
         font-weight:bold;
+
         border-radius:12px;
+
         cursor:pointer;
         user-select:none;
-        transition:0.15s;
+
+        transition:
+            left 0.15s ease,
+            top 0.15s ease,
+            transform 0.15s ease;
     }
 
     .tile:hover{
@@ -125,8 +135,8 @@
     }
 
     .empty{
-        background:transparent;
-        cursor:default;
+        opacity:0;
+        pointer-events:none;
     }
 
     .modal{
@@ -299,28 +309,56 @@ function resetGame(){
 
 function renderBoard(){
 
-    boardEl.innerHTML = ""
+    const tileSize = 70
+    const gap = 6
+    const padding = 8
 
-    boardEl.style.gridTemplateColumns = `repeat(${cols}, 70px)`
+    boardEl.style.width =
+        `${cols * tileSize + (cols - 1) * gap + padding * 2}px`
+
+    boardEl.style.height =
+        `${rows * tileSize + (rows - 1) * gap + padding * 2}px`
 
     board.forEach((value, index) => {
 
-        const tile = document.createElement("div")
+        let tile =
+            boardEl.querySelector(`[data-index="${value}"]`)
 
-        tile.className = "tile"
+        if(!tile){
+
+            tile = document.createElement("div")
+
+            tile.className = "tile"
+
+            tile.dataset.index = value
+
+            boardEl.appendChild(tile)
+
+        }
+
+        const row = Math.floor(index / cols)
+        const col = index % cols
+
+        tile.style.left =
+            `${padding + col * (tileSize + gap)}px`
+
+        tile.style.top =
+            `${padding + row * (tileSize + gap)}px`
 
         if(value === null){
 
             tile.classList.add("empty")
+            tile.textContent = ""
 
         }else{
 
+            tile.classList.remove("empty")
+
             tile.textContent = value
+
             tile.onclick = () => moveTile(index)
 
         }
-
-        boardEl.appendChild(tile)
 
     })
 
